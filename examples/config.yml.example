@@ -1,0 +1,71 @@
+---
+
+logging: 
+  logger_name: "TEST1Nano"
+  logger_model: "RMSVOLTS"
+  logger_location: "Coates"
+
+  # Logging parameters describe this collection station to the logger.
+  logtype: "elk"
+  logtarget: "https://mysite/elasticsearch"
+
+  # Index names will be extended by the application to include the current month. For example "power_quality" becomes "power_quality-2017-08"
+  indexname: "power_quality"
+
+  # Queueing - if ELK goes offline, these parameters come into play
+  # Max number of readings to send from the queue during a single queue run. Queue gets called at the same rate as 
+  # readings are made (1/s typically) so this can be relatively low, but keep it well above 1 or it would never catch up after an outage.
+  max_sends_per_cycle: 10
+
+
+probe: 
+  probe_name: "USBSOUND001"
+  # Probe model types: RMSVOLTS, RMSCURRENT (CT Coil readings)
+  probe_model: "RMSVOLTS"
+  probe_location: "Coates"
+
+
+display: 
+  # Check the probes this many times per second.
+  probe_interval: 10
+  # Print stats ever N loops. Currently the probe loop in question runs 10 times per second so an inteval of 10 means every 1 second. 
+  print_stats_interval: 10
+  print_volts: True
+  print_hz: True
+
+calibration:
+
+  voltage_calculation_method: "average_rms"
+
+  # RMS block parameters
+  # The Alpha parameter is a number between 0-1 that changes how many readings are averaged together. A value of 0 means all, 1 means none. 
+  voltage_calculation_rms_alpha: 0.001
+
+  # Averaging block parameters
+  voltage_rms_average_length: 1000
+  voltage_rms_average_scale: 0.001
+  voltage_rms_max_iter: 40
+
+  # Below we list two parameters for tuning the calculation that converts from the soundcard samples domain (0.0000-1.0000) to actual volts/current.
+  # Given the formula y=m*x+b, x represents the average RMS of input samples and y represents the final voltage/current reading
+  #   slope represents the m parameter
+  #   and intercept parameter represents the b parameter.
+  average_rms_slope: 251.388
+  average_rms_intercept: 0
+
+  # Frequency Calculation calibration
+  # More interpolation means more precise frequency measurement, but it also means higher CPU demand.
+  # Scale the interpolation accordingly if supported by hardware. 
+  freq_getfreq_alpha: 0.1
+  freq_interpolation: 0.1
+  freq_interpolation_multiplier: 10
+
+input:
+  # Input type of "wav" reads input_wav_filename. Anything else reads sound card device. If input_sound_device is not specified, the block chooses a default.
+  input_type: 'wav'
+  input_wav_filename: './samples/sample.wav'
+  # input_wav_filename: './samples/noise.wav'
+  input_sound_device: 'hw:1'
+
+
+

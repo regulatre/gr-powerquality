@@ -1,0 +1,16 @@
+[Unit]
+Description=Power Quality Volts Probe (A)
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/git/gr-powerquality/examples
+ExecStart=/usr/bin/python ./acpq.py -c /etc/acpq/config-VOLTS-A.yml -p 5555
+Restart=always
+; If a service restart is required, pause this many seconds. Default is 100ms which leads to failed service too quickly if say alsa isn't ready yet on boot.
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+

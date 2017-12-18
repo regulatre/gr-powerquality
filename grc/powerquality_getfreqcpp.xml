@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<block>
+  <name>getfreqcpp</name>
+  <key>powerquality_getfreqcpp</key>
+  <category>[Power Quality]</category>
+  <import>import powerquality</import>
+  <make>powerquality.getfreqcpp($initialAlpha)</make>
+
+  <param>
+    <name>Initial Alpha</name>
+    <key>initialAlpha</key>
+    <type>float</type>
+  </param>
+
+  <sink>
+    <name>in</name>
+    <type>float</type>
+  </sink>
+
+  <source>
+    <name>out</name>
+    <type>float</type>
+  </source>
+</block>

@@ -1,0 +1,30 @@
+INCLUDE(FindPkgConfig)
+PKG_CHECK_MODULES(PC_POWERQUALITY powerquality)
+
+FIND_PATH(
+    POWERQUALITY_INCLUDE_DIRS
+    NAMES powerquality/api.h
+    HINTS $ENV{POWERQUALITY_DIR}/include
+        ${PC_POWERQUALITY_INCLUDEDIR}
+    PATHS ${CMAKE_INSTALL_PREFIX}/include
+          /usr/local/include
+          /usr/include
+)
+
+FIND_LIBRARY(
+    POWERQUALITY_LIBRARIES
+    NAMES gnuradio-powerquality
+    HINTS $ENV{POWERQUALITY_DIR}/lib
+        ${PC_POWERQUALITY_LIBDIR}
+    PATHS ${CMAKE_INSTALL_PREFIX}/lib
+          ${CMAKE_INSTALL_PREFIX}/lib64
+          /usr/local/lib
+          /usr/local/lib64
+          /usr/lib
+          /usr/lib64
+)
+
+INCLUDE(FindPackageHandleStandardArgs)
+FIND_PACKAGE_HANDLE_STANDARD_ARGS(POWERQUALITY DEFAULT_MSG POWERQUALITY_LIBRARIES POWERQUALITY_INCLUDE_DIRS)
+MARK_AS_ADVANCED(POWERQUALITY_LIBRARIES POWERQUALITY_INCLUDE_DIRS)
+

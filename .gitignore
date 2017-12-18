@@ -1,0 +1,9 @@
+config.yml
+
+build/
+build-mac/
+
+
+.idea/workspace.xml
+.idea
+
