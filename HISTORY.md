@@ -1,15 +1,3 @@
-### **Synopsis**
-
-In order to better understand the power grid and distribution system in general, I built a small, low cost device that allows me to measure electricity, frequency, and current fluctuations with very high precision. The sensitivity of the device is so great that it can also be used to "listen" to events on the power grid. 
-
- 
-
-The term power quality is an industry term that refers to the quality of electricity, namely how well all aspects of the electricity are within acceptable ranges. 
-
-In this article I will introduce my experiment, show how it is built, and then I’ll share my observations and what I have learned so far.
-
-Thanks to the folks on /r/signalidentification for showing interest and encouraging me to write this article. 
-
 ### **How it started**
 
 Cyber security and the power grid are intertwined; we rely on the power grid now more than ever. It touches every aspect of our lives, from charging our phones to charging our cars. Its continuous reliability and resilience is critical to our day to day lives. Not only are faults and outages a significant concern but so are other things - attacks. Of course the obvious scenario of a  power plant being "hacked" is well known but consider this: As a shared medium between many of our private devices, it (the outlets in your house or business) presents a path for devices to both communicate covertly (covert channel)  and eavesdrop on other devices and their operations (side-channel). More and more devices are connected every day. Today the risks are low and may not be of any concern to most people, but I find the topic fascinating. I want to learn more and get ahead of the risks *before* they arise so that *if* they do arise, I will be well informed and ready to help. 
