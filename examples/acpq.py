@@ -492,7 +492,7 @@ def preStartTasks():
     # Initialize Elasticsearch Logging.
     esTarget = SETTINGS["logging"]["logtarget"]
     print "Initializing Elasticsearch. Endpoint=" + esTarget
-    elasticSearch = Elasticsearch(esTarget)
+    elasticSearch = Elasticsearch(esTarget,ca_certs=certifi.where())
 
 
 

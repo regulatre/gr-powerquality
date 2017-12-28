@@ -3,7 +3,7 @@
 logging: 
   logger_name: "TEST1Nano"
   logger_model: "RMSVOLTS"
-  logger_location: "Coates"
+  logger_location: "BeverlyHills"
 
   # Logging parameters describe this collection station to the logger.
   logtype: "elk"
@@ -22,7 +22,7 @@ probe:
   probe_name: "USBSOUND001"
   # Probe model types: RMSVOLTS, RMSCURRENT (CT Coil readings)
   probe_model: "RMSVOLTS"
-  probe_location: "Coates"
+  probe_location: "BeverlyHills"
 
 
 display: 
