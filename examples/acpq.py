@@ -200,9 +200,28 @@ class testVolts(gr.top_block):
         self.wavfile_input = blocks.wavfile_source('./samples/sample.wav', False)
         self.getfreq_block = powerquality.getfreqcpp(self.freq_getfreq_alpha)
 
-        # Streaming support
+        # Streaming support - opens a TCP port to which external applications can connect and get a tapped feed of raw unaltered samples.
         print "Initializing streaming server blocks."
-        self.blocks_tcp_server_sink_0 = blocks.tcp_server_sink(gr.sizeof_float*1, '0.0.0.0', int(ARGS.port), True)
+        self.blocks_stream_to_tagged_stream = blocks.stream_to_tagged_stream(
+            gr.sizeof_float,
+            1,
+            SETTINGS["networking_tap1"]["tagged_stream_packet_length"],
+            SETTINGS["networking_tap1"]["length_tag_name"])
+        self.blocks_tagged_stream_to_pdu = blocks.tagged_stream_to_pdu(
+            blocks.float_t,
+            SETTINGS["networking_tap1"]["length_tag_name"])
+        self.blocks_socket_pdu = blocks.socket_pdu(
+            "TCP_SERVER",
+            SETTINGS["networking_tap1"]["socket_pdu_bind_host"],
+            str(ARGS.port),
+            SETTINGS["networking_tap1"]["socket_pdu_mtu"],
+            SETTINGS["networking_tap1"]["socket_pdu_nodelay"])
+        # Connect the streaming blocks
+        # self.msg_connect((self.blocks_tagged_stream_to_pdu,"pdus"),(self.blocks_socket_pdu,"pdus"))
+        self.msg_connect((self.blocks_tagged_stream_to_pdu,"pdus"),(self.blocks_socket_pdu,"pdus"))
+        self.connect((self.blocks_stream_to_tagged_stream,0),(self.blocks_tagged_stream_to_pdu,0))
+
+
         self.blocks_multiply_const_vxx_0 = blocks.multiply_const_vff((-1, ))
         self.blocks_delay_0 = blocks.delay(gr.sizeof_float*1, self.fundamental_wavelength_samples)
         self.blocks_add_xx_0 = blocks.add_vff(1)
@@ -255,7 +274,7 @@ class testVolts(gr.top_block):
         self.connect((self.sourceOfSamplesBlock , 0), (self.upsampler, 0))
         # TCP port Tap flow
         print "CONNECTIONS: Connecting TCP/IP port tap flow"
-        self.connect((self.sourceOfSamplesBlock , 0), (self.blocks_tcp_server_sink_0, 0))
+        self.connect((self.sourceOfSamplesBlock , 0), (self.blocks_stream_to_tagged_stream, 0))
 
 
         # Streaming flow - add+accumulator -> tcp server.
@@ -269,7 +288,6 @@ class testVolts(gr.top_block):
             self.connect((self.blocks_multiply_const_vxx_0, 0), (self.blocks_add_xx_0, 1))
             self.connect((self.sourceOfSamplesBlock, 0), (self.blocks_add_xx_0, 0))
             self.connect((self.sourceOfSamplesBlock, 0), (self.blocks_delay_0, 0))
-        # blocks_tcp_server_sink_0
 
 
 
@@ -364,7 +382,16 @@ class testVolts(gr.top_block):
 
             # Try sending it
             try:
-                elasticSearch.index(index=indexName, doc_type='post', id=getUniqueLogID(), body=json.dumps(current_item ))
+                # Default: elk=enabled, but can be set to False in the config file to disable sending of data to elk.
+                elk_enabled = True
+                if ("elk_enabled" in SETTINGS["logging"]):
+                    elk_enabled = SETTINGS["logging"]["elk_enabled"]
+
+                if (elk_enabled == True):
+                    elasticSearch.index(index=indexName, doc_type='post', id=getUniqueLogID(), body=json.dumps(current_item ))
+                else:
+                    print ("elk_enabled=False so not sending this to ELK: " + json.dumps(current_item))
+
                 # TODO Check within the response to look for some sign that it was definitely certainly for sure successful.
                 # successful send? Woohoo! pop it off the left side of the list.
                 self.elk_send_queue.pop()
@@ -500,6 +527,7 @@ def main(top_block_cls=testVolts, options=None):
     global SETTINGS
 
     # Parse commandline arguments
+    print "Note! This application shares the config.yml file with the streamer."
     parseArgs()
 
     # Parse the config file

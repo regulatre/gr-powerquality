@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 ##################################################
 # GNU Radio Python Flow Graph
@@ -18,7 +18,33 @@ from optparse import OptionParser
 import powerquality
 import threading
 import time
+# for config.yml
+import yaml
+import argparse
 
+# Will be overwritten by calls to parseArgs()
+ARGS = {}
+
+parser = argparse.ArgumentParser(prog='streamer',description="VLC Streaming of fundamentally muted baseband audio")
+parser.add_argument('-c', '--config', help='Configuration File Path & Filename',required=False, default="./config.yml")
+parser.add_argument('-D', '--debug', help='Enable debug messages to stdout',required=False)
+
+def parseArgs():
+    global ARGS
+
+    # Parse commandline args. Prints help/usage and terminate application if anything goes wrong
+    ARGS = parser.parse_args()
+    print "Parsed commandline args. They are: " + str(ARGS)
+    # Sanity Checks
+    # If something doesn't check out, run argsFailed()
+
+# Come here if parsing of commandline args failed, or if they are in some way invalid.
+def argsFailed():
+    parser.print_help()
+    sys.exit()
+
+def getConfigValue(keyname):
+    return SETTINGS["streamer"][keyname]
 
 class testAudioStreamPort(gr.top_block):
 
@@ -64,18 +90,43 @@ class testAudioStreamPort(gr.top_block):
         self.blocks_delay_0 = blocks.delay(gr.sizeof_float*1, int(round(func_probe_b)))
         self.blocks_add_xx_1 = blocks.add_vff(1)
         self.blocks_add_xx_0 = blocks.add_vff(1)
-        self.blks2_tcp_source_0_0 = grc_blks2.tcp_source(
-        	itemsize=gr.sizeof_float*1,
-        	addr='pq.k1gto.com',
-        	port=5556,
-        	server=False,
-        )
-        self.blks2_tcp_source_0 = grc_blks2.tcp_source(
-        	itemsize=gr.sizeof_float*1,
-        	addr='pq.k1gto.com',
-        	port=5555,
-        	server=False,
-        )
+
+        # Left channel TCP connection
+        self.blocks_socket_pdu_left_inputchannel = blocks.socket_pdu(
+            "TCP_CLIENT",
+            getConfigValue("pqserver"),
+            str(getConfigValue("left_channel_tap_port")),
+            10000, # this arg is unused because we are client
+            False) # this arg is unused because we are client
+        self.blocks_pdu_to_tagged_stream_left = blocks.pdu_to_tagged_stream(
+            blocks.float_t,
+            SETTINGS["networking_tap1"]["length_tag_name"])
+        self.msg_connect((self.blocks_socket_pdu_left_inputchannel,"pdus"),(self.blocks_pdu_to_tagged_stream_left,"pdus"))
+
+        # Right Channel TCP connection
+        self.blocks_socket_pdu_right_inputchannel = blocks.socket_pdu(
+            "TCP_CLIENT",
+            getConfigValue("pqserver"),
+            str(getConfigValue("right_channel_tap_port")),
+            10000, # this arg is unused because we are client
+            False) # this arg is unused because we are client
+        self.blocks_pdu_to_tagged_stream_right = blocks.pdu_to_tagged_stream(
+            blocks.float_t,
+            SETTINGS["networking_tap1"]["length_tag_name"])
+        self.msg_connect((self.blocks_socket_pdu_right_inputchannel, "pdus"), (self.blocks_pdu_to_tagged_stream_right, "pdus"))
+
+        # self.blks2_tcp_source_0_0 = grc_blks2.tcp_source(
+        # 	itemsize=gr.sizeof_float*1,
+        # 	addr=getConfigValue("pqserver"),
+        # 	port=str(getConfigValue("right_channel_tap_port")),
+        # 	server=False,
+        # )
+        # self.blks2_tcp_source_0 = grc_blks2.tcp_source(
+        # 	itemsize=gr.sizeof_float*1,
+        # 	addr=getConfigValue("pqserver"),
+        # 	port=str(getConfigValue("left_channel_tap_port")),
+        # 	server=False,
+        # )
         self.analog_rail_ff_1 = analog.rail_ff(-0.8, 0.8)
         self.analog_rail_ff_0 = analog.rail_ff(-0.8, 0.8)
 	# 1e-2 (0.01) sounds great when input voltage to the Pi is clean (dirty rectifier voltage can introduce periodic bumps and thumbs that mess up AGC).
@@ -94,8 +145,8 @@ class testAudioStreamPort(gr.top_block):
         self.connect((self.analog_agc2_xx_1, 0), (self.analog_rail_ff_1, 0))
         self.connect((self.analog_rail_ff_0, 0), (self.blocks_wavfile_sink_0, 0))
         self.connect((self.analog_rail_ff_1, 0), (self.blocks_wavfile_sink_0, 1))
-        self.connect((self.blks2_tcp_source_0, 0), (self.fractional_interpolator_xx_0, 0))
-        self.connect((self.blks2_tcp_source_0_0, 0), (self.fractional_interpolator_xx_0_0, 0))
+        self.connect((self.blocks_pdu_to_tagged_stream_left, 0), (self.fractional_interpolator_xx_0, 0))
+        self.connect((self.blocks_pdu_to_tagged_stream_right, 0), (self.fractional_interpolator_xx_0_0, 0))
         self.connect((self.blocks_add_xx_0, 0), (self.blocks_keep_one_in_n_0, 0))
         self.connect((self.blocks_add_xx_1, 0), (self.blocks_keep_one_in_n_0_0, 0))
         self.connect((self.blocks_delay_0, 0), (self.blocks_multiply_const_vxx_0, 0))
@@ -136,8 +187,21 @@ class testAudioStreamPort(gr.top_block):
         self.blocks_delay_1.set_dly(int(round(self.func_probe_b)))
         self.blocks_delay_0.set_dly(int(round(self.func_probe_b)))
 
+def readSettings(configFileName):
+    print "Loading settings from " + configFileName
+    # Read settings from configuration file
+    with open(configFileName, "r") as myfile:
+        fileContents = myfile.read()
+    print "Settings loaded."
+    return yaml.load(fileContents)
 
 def main(top_block_cls=testAudioStreamPort, options=None):
+    global SETTINGS
+    global ARGS
+
+    print "Note! This application shares the config.yml file with acpq.py. Streamer cofiguration is located in the streamer section of the config."
+    parseArgs()
+    SETTINGS = readSettings(ARGS.config)
 
     tb = top_block_cls()
     tb.start()

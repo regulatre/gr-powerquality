@@ -68,4 +68,23 @@ input:
   input_sound_device: 'hw:1'
 
 
+# Networking options associated with "tap1", which is the raw data tap that provides remote access to the raw samples we acquire from the probe.
+networking_tap1:
+  length_tag_name: "packet_len"
+  tagged_stream_packet_length: 100
+  socket_pdu_mtu: 1200
+  ### Leave bind host blank to bind to "any".
+  socket_pdu_bind_host: ""
+  ### Set nodelay to True to disable nagle algorithm, which sometimes buffers up packets before sending them all at once.
+  socket_pdu_nodelay: False
+
+# The streamer utility will look here for its configuration. It also looks at parameters outside this section.
+streamer: 
+  pqserver: "localhost"
+  left_channel_tap_port: 5555
+  right_channel_tap_port: 5555
+
+
+
+
 
