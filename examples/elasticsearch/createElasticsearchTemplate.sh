@@ -145,6 +145,22 @@ curl -XPUT $ELK_BASE_URL/_template/power_quality_template -d '
                             "index": "not_analyzed"
                         },
 
+                        "bias_min": {
+                            "type": "double",
+                            "index": "not_analyzed"
+                        },
+
+                        "bias_max": {
+                            "type": "double",
+                            "index": "not_analyzed"
+                        },
+
+                        "bias_avg": {
+                            "type": "double",
+                            "index": "not_analyzed"
+                        },
+
+
                         "frequencychangecount": {
                             "type": "integer",
                             "index": "not_analyzed"

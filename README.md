@@ -22,6 +22,14 @@ Thanks to the folks in /r/signalidentification for showing interest and encourag
 
 ## Hardware
 
+### USB Sound adapter
+
+A few notes about the USB sound adapter...
+
+There are many many cheap USB sound adapters. Most of them drop packets, have poor clock references, and have a wide range of other glitches.
+
+Stick to the Syba USB CM119 based adapter. Of all the adapters I've used, I always come back to this one. It's reliable, and easy to modify (see TCXO section below)
+
 ### Voltage Probe Parts list
 
 Hardware can vary widely. You can use your own equipment but your mileage may vary. For example if you use the sound card in a computer you may find the power supply to the sound card drifts and introduces some noise, though likely not a deal breaker.
@@ -32,8 +40,22 @@ Hardware can vary widely. You can use your own equipment but your mileage may va
 1. Two 1k resistors
 1. One 100 ohm resistor
 1. A 3.5mm male connector
-1. A Syba USB sound adapter (the black one)
+1. A Syba USB "CM119" sound adapter (the black one)
 1. An Alisten 6 Port USB-C and USB Charger (35 watt 5v USB charging station)
+
+
+Here's a sample resistor bridge built right into a 3.5mm stereo plug. It's up to you where the bridge goes. Consider the possibility of the resistors getting hot (hasn't happened to me yet, but entirely possible with an adequate surge). Protecting your lab from fire is your responsibility.
+
+![Resistor Bridge](images/adapter/resistorBridge.jpg "Resistor Bridge" )
+
+These AC adapters are economical and work just fine.
+(ordering: https://www.allelectronics.com/item/actx-1203/12vac-0.33a-wall-transformer/1.html)
+
+![AC Adapter](images/adapter/ac-adapter.jpg "AC Adapter")
+
+Finished adapter (This one has a TCXO mod hence the designation)
+
+![Finished TCXO Adapter](images/adapter/finished-tcxo-adapter.jpg "Finished TCXO Adapter")
 
 
 ### Assembly Instructions
@@ -68,8 +90,10 @@ sudo pip install elasticsearch certifi PyYAML
 Install the gr-powerquality gnuradio module
 ```
 ** installing gnuradio on Raspi
-# apt-get install gnuradio-dev
-# apt-get install sudo apt-get install cmake libboost-all-dev libcppunit-dev swig doxygen liblog4cpp5-dev python-scipy
+$ wget http://www.sbrac.org/files/build-gnuradio && chmod a+x build-gnuradio && ./build-gnuradio
+*** The above build-gnuradio script needs to be adjusted. see RASPBERRYPI-GNURADIO-TRICKS.md - I emailed the script owner. contact me for a copy of the modified script if needed.
+*** script runs for about 24 hours on a Raspberry pi. use screen utility to run it in the background if needed.
+# apt-get install cmake libboost-all-dev libcppunit-dev swig doxygen liblog4cpp5-dev python-scipy
 $ mkdir git; cd git
 $ git clone https://github.com/regulatre/gr-powerquality
 $ cd gr-powerquality
@@ -303,7 +327,34 @@ This script would be ideal to run headless, but I've had challenges with doing s
 
 It's actually pretty easy to upgrade the crystal in a Syba USB sound card (USB 0d8c:0008 ) to a 0.1ppm TCXO.
 
-These sound cards have a 3.3v power source readily available. See datasheet: http://www.repeater-builder.com/voip/pdf/cm119-datasheet.pdf
+These sound cards have a 3.3v power source readily available.
+
+
+#### TCXO Chip
+
+Part number: ASTX-H11-12.000MHZ-T
+Description: 2.5 ppm Temperature controlled oscillator. 3.3v
+Purchasing: https://www.mouser.com/ProductDetail/815-ASTXH1112T?r=815-ASTXH1112T
+
+#### USB sound adapter
+
+Syba C119/CM119 based Syba USB audio adapters (these are the best ones I've used so far).
+CPU Datasheet: http://www.repeater-builder.com/voip/pdf/cm119-datasheet.pdf
+
+#### Pictures
+
+Here we have a CM119 USB adapter with the crystal removed and a TCXO wired into its place. This may look hideous but it improved the frequency measurement from three decimal places to four or five.
+
+![CM119 with TCXO](images/adapter/cm119-with-tcxo.jpg "CM119 with TCXO")
+
+After the modification you can make it look nice(r)ish
+
+![Finished TCXO Adapter](images/adapter/finished-tcxo-adapter.jpg "Finished TCXO Adapter")
+
+My notes for modifying the sound card with TCXO. Where to get power, where the TCXO leads go.
+
+
+![CM119 TCXO Modification Notes](images/adapter/cm119-tcxo-modification-notes.jpg "CM119 TCXO Modification Notes")
 
 
 ## Further Reading

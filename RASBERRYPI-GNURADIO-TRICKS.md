@@ -43,7 +43,6 @@ Furthermore, I'm also able to use your script on the Raspberry Pi Nano if I make
 >      movne    r11,#15
 
 
-**** update: The neoasm update is also required on Raspberry pi 3 - so that's all recent Raspberry Pi versions.
 
 Keep up the good work - I hope this feedback helps others!
 ```

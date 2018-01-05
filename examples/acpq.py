@@ -49,6 +49,8 @@ ARGS = {}
 # To be set to getEpochMillis() soon enough.
 startTimeSeconds = 0
 
+biasStats = {"biasresetcounter": 0, "running_avg": -1, "running_min": -1, "running_max": -1}
+
 
 parser = argparse.ArgumentParser(prog='acpq',description="AC Power Quality Monitoring Script")
 parser.add_argument('-c', '--config', help='Configuration File Path & Filename',required=False, default="./config.yml")
@@ -182,6 +184,11 @@ class testVolts(gr.top_block):
         proball_thread.daemon = True
         proball_thread.start()
 
+        # Calculate bias readings using this thread. Keep it separate from the others because the 1/10s interval shouldn't be touched, whereas the other thread interval can be set by config file.
+        probe_bias_thread = threading.Thread(target=self.biasCalculationThread)
+        probe_bias_thread.daemon = True
+        probe_bias_thread.start()
+
         debug_print_thread = threading.Thread(target=self.periodic_logging_thread)
         debug_print_thread.daemon = True
         debug_print_thread.start()
@@ -226,6 +233,16 @@ class testVolts(gr.top_block):
         self.blocks_delay_0 = blocks.delay(gr.sizeof_float*1, self.fundamental_wavelength_samples)
         self.blocks_add_xx_0 = blocks.add_vff(1)
 
+
+        # Bias detection - these parameters are tuned to 48khz samp rate: (1 * samp_rate / 60, .00125, 4000)
+        if ("bias" in SETTINGS and "bias_avg_num_waves" in SETTINGS["bias"]):
+            bias_avg_num_waves = SETTINGS["bias"]["bias_avg_num_waves"]
+        else:
+            bias_avg_num_waves = 1
+        # Calculate the number of samples associated with n wavelengths specified in settings or the default.
+        avgBiasNumSamples = bias_avg_num_waves * samp_rate / 60
+        self.blocks_bias_moving_average = blocks.moving_average_ff(avgBiasNumSamples, 1.0/avgBiasNumSamples, 4000)
+        self.probe_bias = blocks.probe_signal_f()
 
 
         ### Calibrate the blocks based on settings from config file
@@ -277,18 +294,9 @@ class testVolts(gr.top_block):
         self.connect((self.sourceOfSamplesBlock , 0), (self.blocks_stream_to_tagged_stream, 0))
 
 
-        # Streaming flow - add+accumulator -> tcp server.
-        # TODO: This is processor intensive, so make it selectable from commandline option.
-        # TODO: Actually, due to the lack of a TCP WAV streaming block, we should just stream baseband unaltered and let a separate process decode and also do data logging and things like that.
-        if (1==0):
-            print "CONNECTIONS: Creating a TCP server to enable access to the audio filter"
-            self.connect((self.blocks_add_xx_0, 0), (self.blocks_tcp_server_sink_0, 0))
-            print "CONNECTIONS: Setting up the audio filtering flow"
-            self.connect((self.blocks_delay_0, 0), (self.blocks_multiply_const_vxx_0, 0))
-            self.connect((self.blocks_multiply_const_vxx_0, 0), (self.blocks_add_xx_0, 1))
-            self.connect((self.sourceOfSamplesBlock, 0), (self.blocks_add_xx_0, 0))
-            self.connect((self.sourceOfSamplesBlock, 0), (self.blocks_delay_0, 0))
-
+        # Bias Detection flow
+        self.connect((self.sourceOfSamplesBlock, 0), (self.blocks_bias_moving_average, 0))
+        self.connect((self.blocks_bias_moving_average, 0), (self.probe_bias, 0))
 
 
         ##################################################
@@ -296,6 +304,61 @@ class testVolts(gr.top_block):
         ##################################################
         self.connect((self.getfreq_block, 0), (self.probe_avgwave, 0))
         self.connect((self.upsampler, 0), (self.getfreq_block, 0))
+
+
+    # This function should be called with the probed average sample value each time it is probed (10 times a second by default).
+    # The results of the running average are saved in the current_readings variable, which gets sent to Elasticsearch periodically.
+    def setCurrentBiasLevel(self,currentBiasLevel):
+        global biasStats
+
+        biasStats["biasresetcounter"] = biasStats["biasresetcounter"] + 1
+        # The modulo here should remain equal to the time interval such that we reset bias stats every 1 second.
+        biasStats["biasresetcounter"] = biasStats["biasresetcounter"] % 10
+
+        # If the modulo rolled over then it's time to reset stats, but first, make move the calculated values into variables where they can be picked up.
+        if (biasStats["biasresetcounter"] == 0):
+            # Effectively turns reported readings into micro instead of raw. Better for Elasticsearch becuase Kibana hates small decimals.
+            scaling_factor = 1000000
+
+            # Save the tallied up values before resetting them
+            self.current_readings["bias_min"] = round(biasStats["running_min"] * scaling_factor)
+            self.current_readings["bias_max"] = round(biasStats["running_max"] * scaling_factor)
+            self.current_readings["bias_avg"] = round(biasStats["running_avg"] * scaling_factor)
+            # biasStats["avg"] = biasStats["running_avg"]
+            # biasStats["min"] = biasStats["running_min"]
+            # biasStats["max"] = biasStats["running_max"]
+
+            # Reset running counters for new use.
+            biasStats["running_avg"] = currentBiasLevel
+            biasStats["running_min"] = currentBiasLevel
+            biasStats["running_max"] = currentBiasLevel
+
+        # Calculate min
+        if (currentBiasLevel < biasStats["running_min"]):
+            biasStats["running_min"] = currentBiasLevel
+
+        # Calculate max
+        if (currentBiasLevel > biasStats["running_min"]):
+            biasStats["running_ax"] = currentBiasLevel
+
+        # Calculate average
+        # (Crude calcualtion method, subject to floating point rounding error becuase only two samples are averaged but it's good enough.)
+        biasStats["running_avg"] = (biasStats["running_avg"] + currentBiasLevel) / 2
+
+
+
+    def biasCalculationThread(self):
+        # number of seconds to pause between each reading.
+        time_period = 10
+
+        while True:
+            try:
+                val = self.probe_bias.level()
+                self.setCurrentBiasLevel(val)
+                time.sleep(1.0 / time_period)
+            except AttributeError:
+                continue
+
 
     def getDefaultReadings(self):
 
@@ -305,6 +368,9 @@ class testVolts(gr.top_block):
             "frequencymin": 60,
             "frequencymax": 60,
             "frequencychangecount":0,
+            "bias_min": -1,
+            "bias_max": -1,
+            "bias_avg": -1
         }
 
         if (getProbeType() == "RMSVOLTS"):
@@ -343,13 +409,14 @@ class testVolts(gr.top_block):
 
 
         # Sanity check: Don't send results until after a brief warm-up period. averages, flow graph stuff, needs to settle in.
+
+        if (ARGS.debug):
+            print "Sending to ES: " + json.dumps(fullMessage)
+
         if (getRuntimeSeconds() < 20):
             remainingSeconds = 20 - getRuntimeSeconds()
             print "WARMUP period not yet elapsed. Skipping one transmit interval to Elasticsearch. remaining seconds = " + str(remainingSeconds)
             return
-
-        if (ARGS.debug):
-            print "Sending to ES: " + json.dumps(fullMessage)
 
         self.elk_send_queue.append(fullMessage)
 
@@ -420,7 +487,9 @@ class testVolts(gr.top_block):
 
     # Apply the conversion factors specified in the config file to convert voltage sample values into actual voltage reading
     def convertSampleToReading(self, sampleReading):
-        return sampleReading * self.average_rms_slope + self.average_rms_intercept
+        convertedReading = sampleReading * self.average_rms_slope + self.average_rms_intercept
+        convertedReading = round(convertedReading,3)
+        return convertedReading
 
     def set_getAvgwaveLevel(self, getAvgwaveLevel):
         self.getAvgwaveLevel = getAvgwaveLevel
@@ -487,6 +556,7 @@ class testVolts(gr.top_block):
             self.set_getAvgwaveLevel(frequency)
             if frequency > 0:
                 myFreq = (self.samp_rate * self.freq_interpolation_multiplier) / frequency
+                myFreq = round(myFreq,6)
                 self.set_current_frequency(myFreq)
         except AttributeError:
             pass

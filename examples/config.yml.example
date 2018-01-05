@@ -84,7 +84,10 @@ streamer:
   left_channel_tap_port: 5555
   right_channel_tap_port: 5555
 
-
-
+# Bias detection parameters
+bias:
+  # Number of 60-cycle wavelengths to average together to come up with the moving average. If too high, brief bias fluctuations won't be detected. 
+  # We poll the bias probe 10 times per second, looking for min/max/avg. 
+  bias_avg_num_waves: 1
 
 
