@@ -17,6 +17,9 @@ logging:
   # readings are made (1/s typically) so this can be relatively low, but keep it well above 1 or it would never catch up after an outage.
   max_sends_per_cycle: 10
 
+  # Warmup seconds: This parameter controls how long we wait for the flowgraph to settle before sending metrics to Elasticsearch
+  warmup_seconds: 5
+
 
 probe: 
   probe_name: "USBSOUND001"
@@ -83,6 +86,14 @@ streamer:
   pqserver: "localhost"
   left_channel_tap_port: 5555
   right_channel_tap_port: 5555
+  harmonic_rms_thread_interval: 10
+  rmsPostSuppressionAlpha: 0.01
+  rmsPostSuppressionAverageLength: 1000
+  rmsPostSuppressionAverageScale: 0.01
+  # AGC Decay rate. 0.01 (1e-2) is a slow decay rate. 0.1 is pretty fast.
+  agc_decay_rate: 0.1
+
+
 
 # Bias detection parameters
 bias:

@@ -394,7 +394,11 @@ class testVolts(gr.top_block):
     # TODO: Queueing. Keep it simple - create an object, key=getUniqueLogID, value=dumps (same as body).
     def sendCurrentReadingsToELK(self):
         fullMessage = self.logTemplate
+        # Putting timestamp in the payload DOES NOT work as you would expect. nor does setting timestamp= on the index/create function. All are ignored :(
         fullMessage["@timestamp"] = getEpochMillis()
+        # Adding our own timestamp field for comparison with @timestamp to track when it blows away @timestamp, namely when we're unqueueing saved readings after an outage.
+        fullMessage["ts6"] = getEpochMillis()
+        fullMessage["timestamp"] = getEpochMillis()
         fullMessage["reading"] = self.current_readings
 
         # TODO: IF we start calling this function many times per second then it would make sense to not calculate the index every time.
@@ -413,10 +417,19 @@ class testVolts(gr.top_block):
         if (ARGS.debug):
             print "Sending to ES: " + json.dumps(fullMessage)
 
-        if (getRuntimeSeconds() < 20):
-            remainingSeconds = 20 - getRuntimeSeconds()
+        # sensible defualt, with option to override it in config file.
+        warmup_seconds = 20
+        if ("warmup_seconds" in SETTINGS["logging"]):
+            warmup_seconds = SETTINGS["logging"]["warmup_seconds"]
+
+        if (getRuntimeSeconds() < warmup_seconds):
+            remainingSeconds = warmup_seconds - getRuntimeSeconds()
             print "WARMUP period not yet elapsed. Skipping one transmit interval to Elasticsearch. remaining seconds = " + str(remainingSeconds)
             return
+
+        # Tag queued items so we know they spent time in the queue. for troubleshooting when needed.
+        if len(self.elk_send_queue) > 1:
+            fullMessage["was_queued"] = 1
 
         self.elk_send_queue.append(fullMessage)
 
@@ -455,7 +468,25 @@ class testVolts(gr.top_block):
                     elk_enabled = SETTINGS["logging"]["elk_enabled"]
 
                 if (elk_enabled == True):
-                    elasticSearch.index(index=indexName, doc_type='post', id=getUniqueLogID(), body=json.dumps(current_item ))
+                    # Calculate how long the message was waiting in the queue.
+                    queue_time_ms = getEpochMillis() - current_item["@timestamp"]
+                    # Add the queue time metric to the payload of the message being indexed.
+                    current_item["queue_time_ms"] = queue_time_ms
+                    # Tried setting id= parameter to None to switch underlying middleware to POST not PUT but timestamp STILl ignored.
+                    # current_item["id"] = getUniqueLogID()
+                    elastic_response = elasticSearch.index(index=indexName, timestamp=current_item["@timestamp"], doc_type='post', id=getUniqueLogID(), body=json.dumps(current_item))
+                    if (ARGS.debug):
+                        print ("DEBUG: ELK responded... response attributes:"
+                               + " queue_time_ms=" + str(queue_time_ms)
+                               + " created=" + str(elastic_response["created"])
+                               + " result=" + str(elastic_response["result"])
+                               + " response_object=" + str(elastic_response))
+                    # Was the index request successful?
+                    if elastic_response["created"] is True and elastic_response["result"] == "created":
+                        pass
+                    else:
+                        print ("acpq elasticsearch indexing failed. response_object=" + str(elastic_response))
+
                 else:
                     print ("elk_enabled=False so not sending this to ELK: " + json.dumps(current_item))
 
@@ -464,8 +495,9 @@ class testVolts(gr.top_block):
                 self.elk_send_queue.pop()
                 if (len(self.elk_send_queue) > 1):
                     print ("Successfully sent one queued reading, there are " + str(len(self.elk_send_queue)) + " more left in the queue!")
-            except:
-                print("Error sending data to index. Unable to send queued readings at this time. elkError=", sys.exc_info()[0])
+            except Exception as ex:
+                # print("Error sending data to index. Unable to send queued readings at this time. elkError=", sys.exc_info()[0])
+                print("Error sending data to index. Unable to send queued readings at this time. elkError=" + str(ex))
                 # send was NOT successful. Bail out of this function so when connection is restored we start at the beginning of the queue.
                 return
 

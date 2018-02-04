@@ -1,4 +1,6 @@
 config.yml
+config
+testing/
 
 build/
 build-mac/

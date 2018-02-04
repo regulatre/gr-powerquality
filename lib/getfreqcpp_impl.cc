@@ -132,7 +132,10 @@ namespace gr {
                 samplesSinceLastDownCross = 0;
             }
 
-
+            // Prevent zeros in the output. It makes for divide by zero in flowgraphs and is very difficult to work around.
+            if (avgSamplesPerZeroDown == 0) {
+                avgSamplesPerZeroDown = 1;
+            }
             out[i] = avgSamplesPerZeroDown;
 
             lastSampleValue = in[i];

@@ -1,0 +1,18 @@
+[Unit]
+Description=AC PQ headphones monitor experiment
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/git/gr-powerquality/examples
+ExecStart=/bin/bash ./acpqheadphones-runner.sh
+Restart=always
+; If a service restart is required, pause this many seconds. Default is 100ms which leads to failed service too quickly if say alsa isn't ready yet on boot.
+RestartSec=10
+
+
+[Install]
+WantedBy=multi-user.target
+
+

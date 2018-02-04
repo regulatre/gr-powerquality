@@ -11,12 +11,12 @@ msg () {
 }
 
 runPythonApp() {
-	mv -v /home/pi/pq.wav /home/pi/pq-$(date +%Y-%m-%d-%H-%m-%S)-RECOVERED.wav
+	mv -v /home/pi/pq.wav /home/pi/pq-$(date +%Y-%m-%d-%H-%M-%S)-RECOVERED.wav
 	msg "starting python app"
 	/home/pi/git/gr-powerquality/examples/acpqheadphones.py  2>&1 | tee -a $LOGFILE
 	EXITCODE=$?
 	msg "Python app exited with code $EXITCODE"
-	mv -v /home/pi/pq.wav /home/pi/pq-$(date +%Y-%m-%d-%H-%m-%S).wav
+	mv -v /home/pi/pq.wav /home/pi/pq-$(date +%Y-%m-%d-%H-%M-%S).wav
 }
 
 # Return bash true (0) if device is connected and ready.
