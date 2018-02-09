@@ -5,13 +5,13 @@ import argparse
 
 # for config.yml
 import yaml
-# for placing HTTPs requests to EM7 and Scoreboard.
 import requests
 from requests.auth import HTTPBasicAuth
 # For exit codes
 import sys
 
-import datetime
+from datetime import datetime
+
 
 from gnuradio import audio
 from gnuradio import filter
@@ -75,12 +75,12 @@ def argsFailed():
 
 # Returns a 2-digit month number
 def getMonthString():
-    dateMonthNumberString = "" + str(datetime.datetime.today().month)
+    dateMonthNumberString = "" + str(datetime.today().month)
     dateMonthNumberString = dateMonthNumberString.zfill(2)
     return dateMonthNumberString
 
 def getYearString():
-    dateYearNumberString = "" + str(datetime.datetime.today().year)
+    dateYearNumberString = "" + str(datetime.today().year)
     return dateYearNumberString
 
 
@@ -96,8 +96,17 @@ def readSettings(configFileName):
 def getHostName():
     return socket.gethostname()
 
+def getEpochSeconds():
+  return long(time.time())
+
 def getEpochMillis():
-    return long(time.time()*1000)
+  dt = datetime.now()
+  return dt.microsecond
+
+def getUniqueLogID():
+  return str(getEpochMillis())
+
+
 
 # Returns number of seconds since application started up.
 def getRuntimeSeconds():
@@ -106,9 +115,6 @@ def getRuntimeSeconds():
         print "WARNING: initializing startTimeSeconds for the first time."
         startTimeSeconds = getEpochMillis() / 1000
     return (getEpochMillis()/1000) - startTimeSeconds
-
-def getUniqueLogID():
-    return "" + str(getEpochMillis())
 
 def getProbeType():
     return SETTINGS["probe"]["probe_model"]
