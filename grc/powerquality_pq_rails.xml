@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<block>
+  <name>pq_rails</name>
+  <key>powerquality_pq_rails</key>
+  <category>[powerquality]</category>
+  <import>import powerquality</import>
+  <make>powerquality.pq_rails($center_freq, $min_freq, $max_freq, $samp_rate)</make>
+  <!-- Make one 'param' node for every Parameter you want settable from the GUI.
+       Sub-nodes:
+       * name
+       * key (makes the value accessible as $keyname, e.g. in the make node)
+       * type -->
+  <param>
+    <name>center_freq</name>
+    <key>center_freq</key>
+    <type>int</type>
+  </param>
+
+  <param>
+    <name>min_freq</name>
+    <key>min_freq</key>
+    <type>int</type>
+  </param>
+
+  <param>
+    <name>max_freq</name>
+    <key>max_freq</key>
+    <type>int</type>
+  </param>
+
+  <param>
+    <name>samp_rate</name>
+    <key>samp_rate</key>
+    <type>int</type>
+  </param>
+
+  <!-- Make one 'sink' node per input. Sub-nodes:
+       * name (an identifier for the GUI)
+       * type
+       * vlen
+       * optional (set to 1 for optional inputs) -->
+  <sink>
+    <name>in</name>
+    <type>float</type>
+  </sink>
+
+  <!-- Make one 'source' node per output. Sub-nodes:
+       * name (an identifier for the GUI)
+       * type
+       * vlen
+       * optional (set to 1 for optional inputs) -->
+  <source>
+    <name>out</name>
+    <type>float</type>
+  </source>
+</block>

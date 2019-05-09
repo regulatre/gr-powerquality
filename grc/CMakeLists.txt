@@ -19,5 +19,6 @@
 
 install(FILES
     powerquality_getfreqcpp.xml
-    powerquality_acsound.xml DESTINATION share/gnuradio/grc/blocks
+    powerquality_acsound.xml
+    powerquality_pq_rails.xml DESTINATION share/gnuradio/grc/blocks
 )

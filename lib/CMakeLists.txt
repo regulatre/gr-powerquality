@@ -27,6 +27,7 @@ link_directories(${Boost_LIBRARY_DIRS})
 
 list(APPEND powerquality_sources
     getfreqcpp_impl.cc
+    pq_rails_impl.cc
 )
 
 set(powerquality_sources "${powerquality_sources}" PARENT_SCOPE)

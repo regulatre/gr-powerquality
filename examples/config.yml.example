@@ -21,11 +21,17 @@ logging:
   warmup_seconds: 5
 
 
+  # if specified, datalogurl OVERRIDES any ELK settings and instead posts readings to a logstash endpoint using the requests library. Multiple readings are batched and sent within the same connection every N seconds.
+  logstashurl: "https://myverycoolxyzserver.com/acpq"
+
+
 probe: 
   probe_name: "USBSOUND001"
   # Probe model types: RMSVOLTS, RMSCURRENT (CT Coil readings)
   probe_model: "RMSVOLTS"
   probe_location: "BeverlyHills"
+  # If Present and True, this variable disables getfreq calculation and friends (saves significant CPU when not needed!)
+  disable_acfreq_calculation: True
 
 
 display: 
@@ -42,7 +48,7 @@ calibration:
 
   # RMS block parameters
   # The Alpha parameter is a number between 0-1 that changes how many readings are averaged together. A value of 0 means all, 1 means none. 
-  voltage_calculation_rms_alpha: 0.001
+  voltage_calculation_rms_alpha: 0.1
 
   # Averaging block parameters
   voltage_rms_average_length: 1000
@@ -70,28 +76,46 @@ input:
   # input_wav_filename: './samples/noise.wav'
   input_sound_device: 'hw:1'
 
-
 # Networking options associated with "tap1", which is the raw data tap that provides remote access to the raw samples we acquire from the probe.
-networking_tap1:
-  length_tag_name: "packet_len"
-  tagged_stream_packet_length: 100
-  socket_pdu_mtu: 1200
-  ### Leave bind host blank to bind to "any".
-  socket_pdu_bind_host: ""
-  ### Set nodelay to True to disable nagle algorithm, which sometimes buffers up packets before sending them all at once.
-  socket_pdu_nodelay: False
+tap_rawsamples:
+  zmq_bind_uri: 'tcp://0.0.0.0:4444'
+  zmq_timeout: 5000
 
-# The streamer utility will look here for its configuration. It also looks at parameters outside this section.
+
+
+# The streamer utility will look here for its configuration
 streamer: 
-  pqserver: "localhost"
-  left_channel_tap_port: 5555
-  right_channel_tap_port: 5555
-  harmonic_rms_thread_interval: 10
+  sourcename: 'examplesource'
+  # If freq doesn't change for this many sample intervals then terminate the streamer. In a power outage, it's useful to have this set high.
+  max_freq_nochange_count: 300
+  # The RMS noise volume thread also terminates if no changes within this many iterations.
+  rmspostsup_nochange_count_max: 60
+  zmq_server_uri_left_channel: 'tcp://127.0.0.1:4444'
+  zmq_server_uri_right_channel: 'tcp://127.0.0.1:4444'
+  # thread run interval in seconds.
+  harmonic_rms_thread_interval: 1
   rmsPostSuppressionAlpha: 0.01
   rmsPostSuppressionAverageLength: 1000
   rmsPostSuppressionAverageScale: 0.01
-  # AGC Decay rate. 0.01 (1e-2) is a slow decay rate. 0.1 is pretty fast.
+  # AGC Decay rate. 0.01 (1e-2) is a slow decay rate. 0.1 is pretty fast. 
   agc_decay_rate: 0.1
+  getfreq_alpha: 0.1
+  # if not enabled then don't try to talk or send to kafka
+  kafka_enabled: True
+  # Kafka endpoint list. 
+  kafka_broker_list: 'localhost:9092'
+  # Name of the topic where allstats messages shall be sent.
+  kafka_topic_allstats: 'pq.streamer.allstats'
+  # application log messages.
+  kafka_topic_logs: 'pq.streamer.logs'
+  # Wait no more than this many seconds for a message to be received and acknowledged from kafka server.
+  kafka_message_send_timeout_seconds: 5
+  # How often should the streamer send messages to Kafka?
+  kafka_send_thread_interval: 10
+  # Print tons of debug messages to stderr?
+  debug_messages_fft: True
+
+
 
 
 
@@ -100,5 +124,52 @@ bias:
   # Number of 60-cycle wavelengths to average together to come up with the moving average. If too high, brief bias fluctuations won't be detected. 
   # We poll the bias probe 10 times per second, looking for min/max/avg. 
   bias_avg_num_waves: 1
+
+
+mobile_logger:
+  zmq_bind_uri: 'tcp://0.0.0.0:4444'
+  zmq_bind_uri_muted: 'tcp://0.0.0.0:4445'
+  zmq_timeout: 5000
+  #input_assumed_wavelength: 735
+  sample_rate: 48000
+  input_assumed_wavelength: 800
+  # input_device: "hw:VOLTS_A"
+  # For wav file input, specify a wav file name instead of device name. the .wav will trigger conditional logic. UNTESTED
+  input_device_wav: ""
+  input_device: "hw:1"
+  wav_output_filename: "pq.wav"
+  runtime_seconds: 300
+  agc_attack_rate: 0.1
+  agc_decay_rate: 0.5
+  agc_reference: 0.01
+  rawinput_rms_alpha: 0.0001
+  rawinput_rms_check_frequency: 1.0
+  # How often to roll up any new stats and send them on their way.
+  collect_stats_frequency: 1.0
+  # raw input RMS * 1000. So 500 = 0.5 average raw input RMS target
+  device_agc_autotune_setpoint: 500
+  # if gain is less than device_agc_autotune_setpoint-device_agc_autotune_wiggleroom then gain will be increased.
+  # If gain is greater than device_agc_autotune_setpoint + device_agc_autotune_wiggleroom gain will be increased.
+  device_agc_autotune_wiggleroom: 100
+  auto_gain_adjustments: "False"
+  # We upsample from 48KHz to N*48KHz in order to achieve higher precision in the rails block.
+  upsample_multiplier: 10
+
+
+# Each reading gets queued immediately and then a separate thread handles dequeueing readings and sending them to ELK when it is available/reachable. This is where the sqlite persistent storage will be kept.
+message_queue:
+  queuename: './pq-mq'
+
+
+# Application circuit breakers
+circuit_breakers:
+  rss_max_megabytes: 120
+
+
+# For data science ingestion
+datalog:
+  filename: "/tmp/pq-datalog.txt"
+  oldfilename: "/tmp/pq-datalog-old.txt"
+  maxmegabytes: 50
 
 
