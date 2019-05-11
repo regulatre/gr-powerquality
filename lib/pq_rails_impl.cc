@@ -33,43 +33,9 @@ using namespace std;
 
 namespace gr {
   namespace powerquality {
-    int nudgeTippingPoint = 5; // 10 is a very stable value, but tends to be slow to adapt to rapid freq changes.
-
-    bool printQualityNextTime = false;
-
-    // Keep a copy of the sample rate. This gets set in the constructor. Specified by the user as block parameter.
-    int samp_rate = -1;
-
-    // raw input samples just stored for local use.
-    float *sampleBuffer;
-    int sampleBufferPosition = 0;
-
-    // inverted buffer contains a copy of all the same samples as sampleBuffer but multiplied by -1.
-    float *sampleBufferInverted;
-
-    // absolute time offset, set to 0 upon startup, incremented periodically in a somewhat accurate but not completely accurate manner.
-    // time in this case is measured in seconds.
-    float absoluteTimeOffset = 0;
-
-    // pipeline delay definitions. Will be set initially in the constructor.
-    int pipelineADelay;
-    int pipelineBDelay;
-    int pipelineCDelay;
-    float pipelineAMagnitude;
-    float pipelineBMagnitude;
-    float pipelineCMagnitude;
-    float pipelineBMagnitudeUnmuted;
-    int pipelineSampleCount = 0; // will continuously be incremented and reset each time we analyze the pipelines.
-    int pipelineSampleLimit;     // Re-calculate pipeline delays every N samples, specified by this variable, calculated in the constructor based on samp_rate.
-    float muteQuality = 0; // an arbitrary number representing the quality of muting. Basically a ratio of unmuted to muted audio. Higher is better.
-
-    int nudge = 0; // this gets nudged up and down, eventually triggering a change to wavelength if appropriate.
 
 
-    // The message handling destination
-    pmt::pmt_t pmt_out;
-
-    static void resetPipelineMagnitudes() {
+    void pq_rails_impl::resetPipelineMagnitudes() {
         pipelineAMagnitude=0;
         pipelineBMagnitude=0;
         pipelineCMagnitude=0;
@@ -82,7 +48,7 @@ namespace gr {
 
     // This function can be used by various functions to calculate the "delayed" index of a sample within one of the ring buffers.
     // we assume the number of elements in the buffer is equivalent to samp_rate.
-    static int getDelayedPosition(int position,int delayBySamples) {
+    int pq_rails_impl::getDelayedPosition(int position,int delayBySamples) {
 
         int delayedPosition;
 
@@ -103,18 +69,18 @@ namespace gr {
      * Retrieve a single sample from the sample buffer. Allow for a delay to be specified.
      * So instead of grabbing current sample, you can get the sample value n samples ago.
      **/
-    static float getSample(int delayBySamples) {
+    float pq_rails_impl::getSample(int delayBySamples) {
         return sampleBuffer[getDelayedPosition(sampleBufferPosition,delayBySamples)];
     }
 
-    static float getSampleInverted(int delayBySamples) {
+    float pq_rails_impl::getSampleInverted(int delayBySamples) {
         return sampleBufferInverted[getDelayedPosition(sampleBufferPosition,delayBySamples)];
     }
 
 
     // fire this function against each sample to calculate the current cancellation sum/magnitude and store it.
     // the pipeline with the lowest magnitude at the time of periodic review will be the favored one, whether it's B (current) or the A or C rails.
-    static void calculatePipelineSums() {
+    void pq_rails_impl::calculatePipelineSums() {
 //        pipelineAMagnitude += fabs(getSample(0) + getSampleInverted(pipelineADelay));
 //        pipelineBMagnitude += fabs(getSample(0) + getSampleInverted(pipelineBDelay)); // represents current output.
 //        pipelineCMagnitude += fabs(getSample(0) + getSampleInverted(pipelineCDelay));
@@ -141,7 +107,7 @@ namespace gr {
     /**
      * Store a sample in the incoming sample buffer.
      **/
-    static void storeSample(float sampleValue) {
+    void pq_rails_impl::storeSample(float sampleValue) {
         sampleBuffer[sampleBufferPosition] = sampleValue;
         sampleBufferInverted[sampleBufferPosition] = sampleValue * -1;
 
@@ -157,7 +123,7 @@ namespace gr {
     /**
      * This gets called when the delay (calcualted frequency) changes
      */
-    static void setPipelineDelay(int centerPipelineDelaySamples) {
+    void pq_rails_impl::setPipelineDelay(int centerPipelineDelaySamples) {
         pipelineADelay = centerPipelineDelaySamples - 1;
         pipelineBDelay = centerPipelineDelaySamples;
         pipelineCDelay = centerPipelineDelaySamples + 1;
@@ -171,7 +137,7 @@ namespace gr {
     /**
      * return true if a nudge occurred. False otherwise.
      */
-    static string doNudge(int nudgeNumber) {
+    string pq_rails_impl::doNudge(int nudgeNumber) {
         string statusString;
         // <moved to global> int nudgeTippingPoint = 10; // 3 is ok but results in oscillations at times.
 
@@ -214,12 +180,12 @@ namespace gr {
         return statusString;
     }
 
-    static float getMuteQuality() {
+    float pq_rails_impl::getMuteQuality() {
         return pipelineBMagnitudeUnmuted / pipelineBMagnitude; // applies to last iteration at any given time.
     }
 
     // Analyze pipeline magnitudes,
-    static string reCalculateBestDelay() {
+    string pq_rails_impl::reCalculateBestDelay() {
 
 //        float ratio_b_a = pipelineBMagnitude / pipelineAMagnitude;
 //        float ratio_b_c = pipelineBMagnitude / pipelineCMagnitude;
@@ -277,6 +243,18 @@ namespace gr {
               gr::io_signature::make(1,1, sizeof(float)),
               gr::io_signature::make(1,1, sizeof(float)))
     {
+
+
+        nudgeTippingPoint = 5;  // 10 is a very stable value, but tends to be slow to adapt to rapid freq changes.
+        printQualityNextTime = false;
+        //samp_rate = -1; // Keep a copy of the sample rate. This gets set in the constructor. Specified by the user as block parameter.
+        sampleBufferPosition = 0;
+        absoluteTimeOffset = 0;
+        pipelineSampleCount = 0;
+        muteQuality = 0;
+        nudge = 0;
+        // TODO: Do something useful with the min/max freq - these are useful for extremely low power settings where fundamental might be lower power than harmonics.
+
 
         samp_rate = new_samp_rate;
         printf ("[pq_rails] sample rate is %i\n", samp_rate);

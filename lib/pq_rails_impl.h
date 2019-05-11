@@ -29,7 +29,60 @@ namespace gr {
     class pq_rails_impl : public pq_rails
     {
      private:
-      // Nothing to declare in this block.
+      int nudgeTippingPoint;
+
+      bool printQualityNextTime;
+
+      int samp_rate;
+
+      // raw input samples just stored for local use.
+      float *sampleBuffer;
+      int sampleBufferPosition;
+
+      // inverted buffer contains a copy of all the same samples as sampleBuffer but multiplied by -1.
+      float *sampleBufferInverted;
+
+      // absolute time offset, set to 0 upon startup, incremented periodically in a somewhat accurate but not completely accurate manner.
+      // time in this case is measured in seconds.
+      float absoluteTimeOffset;
+
+      // pipeline delay definitions. Will be set initially in the constructor.
+      int pipelineADelay;
+      int pipelineBDelay;
+      int pipelineCDelay;
+      float pipelineAMagnitude;
+      float pipelineBMagnitude;
+      float pipelineCMagnitude;
+      float pipelineBMagnitudeUnmuted;
+      int pipelineSampleCount;        // will continuously be incremented and reset each time we analyze the pipelines.
+      int pipelineSampleLimit;        // Re-calculate pipeline delays every N samples, specified by this variable, calculated in the constructor based on samp_rate.
+      float muteQuality;              // an arbitrary number representing the quality of muting. Basically a ratio of unmuted to muted audio. Higher is better.
+
+      int nudge;                      // this gets nudged up and down, eventually triggering a change to wavelength if appropriate.
+
+
+      // The message handling destination
+      pmt::pmt_t pmt_out;
+
+
+      void initPrivateVars();
+      void resetPipelineMagnitudes();
+      int getDelayedPosition(int position,int delayBySamples);
+
+      float getSample(int delayBySamples);
+      float getSampleInverted(int delayBySamples);
+      void calculatePipelineSums();
+      void storeSample(float sampleValue);
+      void setPipelineDelay(int centerPipelineDelaySamples);
+      std::string doNudge(int nudgeNumber);
+      float getMuteQuality();
+      std::string reCalculateBestDelay();
+
+
+
+
+
+
 
      public:
       pq_rails_impl(int center_freq, int min_freq, int max_freq, int new_samp_rate);
